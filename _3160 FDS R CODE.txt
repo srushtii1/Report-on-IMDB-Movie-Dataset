@@ -1,0 +1,214 @@
+﻿#Installing necessary packages
+install.packages("ggplot2") # making simple graphs visualization
+install.packages("dplyr") #manipulation
+install.packages("caTools")  #conditional analysis tools
+install.packages("plotly") #making interactive graphs
+
+
+# Load necessary libraries
+library(ggplot2) 
+library(dplyr) 
+library(caTools)
+library(plotly)
+
+
+# Load your IMDb dataset 
+IMDB <- read.csv("C:/IMDB.csv")
+View(IMDB)
+
+
+#show the dimension of our dataset
+#dim() function is used to retrieve the dimensions of our dataset
+dim(IMDB)
+
+
+#It will give us last value
+tail(IMDB)
+
+
+#It will give first values
+head(IMDB)
+
+
+#give column names
+#colnames() function is used to retrieve the column names.
+colnames(IMDB)
+
+
+#is.na() is used to check for missing values in a dataset.
+sum(is.na(IMDB))
+
+
+#checking duplicate values
+sum(duplicated(IMDB))
+
+
+# View the structure and the first few rows of the dataset
+#str() function is used to display the structure of dataset.
+str(imdb_data)
+
+
+#view() function opens the dataset in a separate interactive viewer window, making it easier to examine data
+View(imdb_data)
+
+
+#DATA VISUALIZATION
+# Filter out rows with missing or non-numeric Movie.Rating values
+imdb_data <- imdb_data %>%
+  filter(!is.na(Movie.Rating), is.numeric(Movie.Rating))
+
+
+# 1. Histogram of Movie Ratings
+ggplot(data = imdb_data, aes(x = Movie.Rating)) +
+  geom_histogram(binwidth = 0.5, fill = "blue", color = "black") +
+  labs(title = "Distribution of Movie Ratings",
+       x = "Movie Rating",
+       y = "Frequency")
+#Conclusion: The histogram of movie ratings shows a roughly normal distribution with a peak around the 6.5 to 7.0 range.
+
+
+# 2. Scatterplot of Votes vs. Movie Ratings
+ggplot(data = imdb_data, aes(x = Votes, y = Movie.Rating)) +
+  geom_point(color = "green") +
+  labs(title = "Scatterplot of Votes vs. Movie Ratings",
+       x = "Votes",
+       y = "Movie Rating")
+#Conclusion: There seems to be a positive correlation between the number of votes a movie receives and its rating. As the number of votes increases, movies tend to have higher ratings.
+
+
+
+
+# 3. Boxplot of Movie Ratings by Year of Release
+ggplot(data = imdb_data, aes(x = as.factor(Year.of.relase), y = Movie.Rating)) +
+  geom_boxplot(fill = "purple") +
+  labs(title = "Boxplot of Movie Ratings by Year of Release",
+       x = "Year of Release",
+       y = "Movie Rating")
+#Conclusion: The boxplot of movie ratings by year of release shows that the median movie rating remains relatively stable over the years. However, there are outliers on both ends,indicating that there are exceptional movies with very high and very low ratings in each year.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 4. Bar chart of Directors with the most movies
+top_directors <- imdb_data %>%
+  group_by(Director) %>%
+  summarize(Count = n()) %>%
+  top_n(10, Count)
+
+
+ggplot(data = top_directors, aes(x = reorder(Director, -Count), y = Count)) +
+  geom_bar(stat = "identity", fill = "orange") +
+  coord_flip() +
+  labs(title = "Top 10 Directors with the Most Movies",
+       x = "Director",
+       y = "Number of Movies")
+#Conclusion:The bar chart identifies the top 10 directors with the most movies in the dataset. Director frequencies vary, with one director having significantly more movies than the others in the top 10.
+
+
+#MODEL BUILDING
+#It filters the dataset to create a subset d_subset containing movies released after 2000 with a Movie Rating of 7 or highe
+d_subset <- imdb_data %>%
+  filter(Year.of.relase >= 2000 & Movie.Rating >= 7.0)
+
+
+# View the filtered subset
+View(d_subset)
+
+
+# Splitting the dataset into training and test sets
+ssplit <- caTools::sample.split(imdb_data$Movie.Rating, SplitRatio = 0.75) 
+table(ssplit)
+#It splits the data into training and test sets using a 75/25 split ratio with caTools::sample.split.
+
+
+#By splitting your data into training and testing sets, you can use the d_train dataset to train your machine learning model and the d_test dataset to evaluate its performance.
+d_train <- subset(imdb_data, ssplit == TRUE)
+d_test <- subset(imdb_data, ssplit == FALSE)
+
+
+#View dimensions of training and testing sets
+dim(d_train)
+dim(d_test)
+
+
+# MULTIPLE LINEAR REGRESSION
+#It makes predictions on the test dataset and combines actual and predicted values into final_data.
+predicted <- predict(model_train, newdata = d_test)
+
+
+# Combine actual and predicted values
+final_data <- cbind('Actual' = d_test$Movie.Rating, 'Predicted' = predicted)
+View(final_data)
+
+
+# Building the model
+multi <- lm(Movie.Rating ~ Watchtime + Votes + Year.of.relase, data = d_train)
+
+
+# Predicting on the test dataset
+multi_p <- predict(multi, newdata = d_test)
+
+
+# Combine  columns by using cbind function,actual and predicted values
+multi_data <- cbind('Actual' = d_test$Movie.Rating, 'Predicted' = multi_p)
+View(multi_data)
+
+
+# Convert to a data frame
+multi_data <- as.data.frame(multi_data)
+
+
+# Finding error
+multi_data$m_error <- multi_data$Actual - multi_data$Predicted
+
+
+#It calculates the root mean square error (RMSE) as a measure of model performance
+rmse2 <- sqrt(mean(multi_data$m_error^2))
+rmse2
+
+
+fit<-lm(Predicted ~ Actual ,data= multi_data)
+summary(fit)
+
+
+# Create a scatter plot with Actual vs. Predicted
+scatter_plot <- plot_ly(data = multi_data, x = ~Actual, y = ~Predicted, type = 'scatter', mode = 'markers', name = 'Scatter') %>%
+  add_trace(x = ~Actual, y = ~Predicted, mode = 'lines', name = 'Regression Line', 
+            line = list(color = 'orange'), 
+            marker = list(color = 'green'))  # Change scatter point color here
+
+
+# Customize the layout
+layout <- list(
+  title = "Scatterplot with Regression Line",
+  xaxis = list(title = "Actual"),
+  yaxis = list(title = "Predicted")
+)
+
+
+# Combine the scatter plot and layout
+scatter_plot <- scatter_plot %>% layout(layout)
+
+
+# Display the combined plot
+scatter_plot
+
+
+
+
+#CONCLUSION:The project is essentially a step-by-step process that loads, explores, models, evaluates, and visualizes data from an IMDb dataset.
+#It demonstrates how to perform linear regression, handle missing values, and create different types of plots for data exploration and visualization.
